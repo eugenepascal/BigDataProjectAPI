@@ -7,7 +7,6 @@ def get_all_utilisateurs(db: Session, skip: int = 0, limit: int = 100):
         print(f"Executing query with skip: {skip}, limit: {limit}")
         users = db.query(Utilisateur).offset(skip).limit(limit).all()
         print(f"Query result: {users}")
-        return users
     except Exception as e:
         print(f"Error in get_all_utilisateurs: {e}")
         raise

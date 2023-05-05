@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from typing import List
-import pymysql
+import mysql.connector
+from mysql.connector import errorcode
 import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
@@ -17,18 +18,20 @@ mysql_password = os.getenv("DB_PASSWORD")
 mysql_host = os.getenv("DB_HOST")
 mysql_database = os.getenv("DB_NAME")
 
+config = {
+  'host':mysql_host,
+  'user':mysql_user,
+  'password':mysql_password,
+  'database':mysql_database,
+}
+
 app = FastAPI()
 
 def test_connection():
     try:
-        connection = pymysql.connect(
-            host=mysql_host,
-            user=mysql_user,
-            password=mysql_password,
-            database=mysql_database,
-        )
+        conn = mysql.connector.connect(**config)
         print("Successfully connected to the database.")
-        connection.close()
+        conn.close()
         return True
     except Exception as e:
         print(f"Error in test_connection: {e}")  # Afficher l'erreur pour aider au débogage
@@ -42,18 +45,23 @@ async def startup():
 
 def get_db():
     db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    db.commit()
+    return db
 
 @app.get("/")
 async def read_root():
     return {"message": "Successfully connected to Azure MySQL database!"}
 
-@app.get("/utilisateurs/", response_model=List[UtilisateurOut])
+@app.get("/utilisateurs")
 async def get_all_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return get_all_utilisateurs(db, skip=skip, limit=limit)
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM utilisateurs;")
+    rows = cursor.fetchall()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return rows#users#get_all_utilisateurs(db, skip=skip, limit=limit)
 
 @app.post("/utilisateurs/", response_model=UtilisateurOut)
 async def create_user(user: UtilisateurCreate, db: Session = Depends(get_db)):
