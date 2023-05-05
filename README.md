@@ -26,3 +26,4 @@ Now, let’s install the necessary packages for our project. We will use Uvicorn
 
 With our project set up, we can create our FastAPI server. Create a main.py file in the project’s root directory and add the following code to it
 
+
