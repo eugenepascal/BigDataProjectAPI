@@ -5,9 +5,13 @@ from mysql.connector import errorcode
 import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
+from starlette import status
+
 from schemas import UtilisateurCreate, UtilisateurOut
 from crud import get_utilisateur, create_utilisateur, delete_utilisateur, get_all_utilisateurs
 from database import SessionLocal
+from schemas import LoginInput, ResetPasswordInput
+from crud import authenticate_user, reset_password
 
 # Charger les valeurs du fichier .env
 load_dotenv()
@@ -81,3 +85,17 @@ async def remove_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     delete_utilisateur(db, user_id)
     return {"message": f"User {user_id} deleted successfully"}
+
+@app.post("/login")
+async def login_route(login_input: LoginInput, db: Session = Depends(get_db)):
+    user = authenticate_user(db, email=login_input.email, password=login_input.mot_de_passe)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
+    return {"message": "Successfully logged in"}
+
+@app.post("/reset-password")
+async def reset_password_route(reset_input: ResetPasswordInput, db: Session = Depends(get_db)):
+    user = reset_password(db, email=reset_input.email, new_password=reset_input.new_password)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email not found")
+    return {"message": "Password reset successfully"}

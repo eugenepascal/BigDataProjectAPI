@@ -46,3 +46,22 @@ def delete_utilisateur(db: Session, utilisateur_id: int):
     db.delete(db_utilisateur)
     db.commit()
     return db_utilisateur
+
+def authenticate_user(db: Session, email: str, password: str):
+    user = get_utilisateur_by_email(db, email)
+    if user and user.mot_de_passe == password:
+        return user
+    return None
+
+def reset_password(db: Session, email: str, new_password: str):
+    user = get_utilisateur_by_email(db, email)
+    if not user:
+        return None
+    user.mot_de_passe = new_password
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+def get_utilisateur_by_email(db: Session, email: str):
+    return db.query(Utilisateur).filter(Utilisateur.Email == email).first()
