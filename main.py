@@ -68,8 +68,34 @@ async def get_all_users(skip: int = 0, limit: int = 100, db: Session = Depends(g
     return rows#users#get_all_utilisateurs(db, skip=skip, limit=limit)
 
 @app.post("/utilisateurs/", response_model=UtilisateurOut)
-async def create_user(user: UtilisateurCreate, db: Session = Depends(get_db)):
-    return create_utilisateur(db, user)
+async def create_user(user: UtilisateurCreate):
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Générer un ID_utilisateur unique pour le nouvel utilisateur
+    cursor.execute("SELECT MAX(ID_utilisateur) FROM Utilisateurs")
+    max_id = cursor.fetchone()[0]
+    new_id = max_id + 1 if max_id is not None else 1
+
+    # Insérer le nouvel utilisateur dans la base de données
+    cursor.execute(
+        f"INSERT INTO Utilisateurs (ID_utilisateur, Nom_utilisateur, Email, Mot_de_passe, Date_inscription) "
+        f"VALUES ({new_id}, '{user.Nom_utilisateur}', '{user.Email}', '{user.Mot_de_passe}', '{user.Date_inscription}')"
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Retourner le nouvel utilisateur créé
+    return {
+        "ID_utilisateur": new_id,
+        "Nom_utilisateur": user.Nom_utilisateur,
+        "Email": user.Email,
+        "Mot_de_passe": user.Mot_de_passe,
+        "Date_inscription": user.Date_inscription,
+    }
+
 
 @app.get("/utilisateurs/{user_id}", response_model=UtilisateurOut)
 async def get_user(user_id: int, db: Session = Depends(get_db)):
