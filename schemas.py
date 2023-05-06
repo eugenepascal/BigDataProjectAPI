@@ -37,7 +37,7 @@ class UtilisateurOut(UtilisateurBase):
         orm_mode = True
 
 class LoginInput(BaseModel):
-    Email: EmailStr
+    Nom_utilisateur: str
     Mot_de_passe: str
 
 class ResetPasswordInput(BaseModel):

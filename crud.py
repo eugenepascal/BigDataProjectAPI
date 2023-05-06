@@ -47,21 +47,20 @@ def delete_utilisateur(db: Session, utilisateur_id: int):
     db.commit()
     return db_utilisateur
 
-def authenticate_user(db: Session, email: str, password: str):
-    user = get_utilisateur_by_email(db, email)
-    if user and user.mot_de_passe == password:
+def authenticate_user(db: Session, Nom_utilisateur: str, Mot_de_passe: str):
+    user = db.query(Utilisateur).filter(Utilisateur.Nom_utilisateur == Nom_utilisateur).first()
+    if user and user.Mot_de_passe == Mot_de_passe:
         return user
     return None
 
-def reset_password(db: Session, email: str, new_password: str):
-    user = get_utilisateur_by_email(db, email)
+def reset_password(db: Session, Email: str, new_password: str):
+    user = db.query(Utilisateur).filter(Utilisateur.Email == Email).first()
     if not user:
         return None
-    user.mot_de_passe = new_password
-    db.add(user)
+    user.Mot_de_passe = new_password
     db.commit()
-    db.refresh(user)
     return user
+
 
 def get_utilisateur_by_email(db: Session, email: str):
     return db.query(Utilisateur).filter(Utilisateur.Email == email).first()

@@ -87,15 +87,33 @@ async def remove_user(user_id: int, db: Session = Depends(get_db)):
     return {"message": f"User {user_id} deleted successfully"}
 
 @app.post("/login")
-async def login_route(login_input: LoginInput, db: Session = Depends(get_db)):
-    user = authenticate_user(db, email=login_input.email, password=login_input.mot_de_passe)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
+async def login_route(login_input: LoginInput):
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM utilisateurs WHERE Nom_utilisateur = %s;", (login_input.Nom_utilisateur,))
+    user = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if user is None or user[3] != login_input.Mot_de_passe:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nom_utilisateur ou mot de passe incorrect")
     return {"message": "Successfully logged in"}
 
 @app.post("/reset-password")
-async def reset_password_route(reset_input: ResetPasswordInput, db: Session = Depends(get_db)):
-    user = reset_password(db, email=reset_input.email, new_password=reset_input.new_password)
+async def reset_password_route(reset_input: ResetPasswordInput):
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM utilisateurs WHERE Email = %s;", (reset_input.Email,))
+    user = cursor.fetchone()
+
     if user is None:
+        cursor.close()
+        conn.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email not found")
+
+    cursor.execute("UPDATE utilisateurs SET Mot_de_passe = %s WHERE Email = %s;", (reset_input.new_password, reset_input.Email))
+    conn.commit()
+    cursor.close()
+    conn.close()
     return {"message": "Password reset successfully"}
