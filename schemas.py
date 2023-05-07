@@ -43,3 +43,7 @@ class LoginInput(BaseModel):
 class ResetPasswordInput(BaseModel):
     Email: EmailStr
     new_password: str
+
+class UserLogged(UtilisateurBase):
+    ID_utilisateur: int
+    Date_inscription: date

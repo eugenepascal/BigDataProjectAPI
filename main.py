@@ -4,13 +4,14 @@ import mysql.connector
 from mysql.connector import errorcode
 import os
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from starlette import status
 
 from schemas import UtilisateurCreate, UtilisateurOut
 from crud import get_utilisateur, create_utilisateur, delete_utilisateur, get_all_utilisateurs
 from database import SessionLocal
-from schemas import LoginInput, ResetPasswordInput
+from schemas import LoginInput, ResetPasswordInput, UserLogged
 from crud import authenticate_user, reset_password
 
 # Charger les valeurs du fichier .env
@@ -30,6 +31,16 @@ config = {
 }
 
 app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def test_connection():
     try:
@@ -112,7 +123,7 @@ async def remove_user(user_id: int, db: Session = Depends(get_db)):
     delete_utilisateur(db, user_id)
     return {"message": f"User {user_id} deleted successfully"}
 
-@app.post("/login")
+@app.post("/login", response_model=UserLogged)
 async def login_route(login_input: LoginInput):
     conn = mysql.connector.connect(**config)
     cursor = conn.cursor()
@@ -121,10 +132,16 @@ async def login_route(login_input: LoginInput):
     conn.commit()
     cursor.close()
     conn.close()
-
+    print(user[0])
     if user is None or user[3] != login_input.Mot_de_passe:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nom_utilisateur ou mot de passe incorrect")
-    return {"message": "Successfully logged in"}
+    return {
+        "ID_utilisateur": user[0],
+        "Nom_utilisateur": user[1],
+        "Email": user[2],
+        "Mot_de_passe": user[3],
+        "Date_inscription": user[4],
+    }
 
 @app.post("/reset-password")
 async def reset_password_route(reset_input: ResetPasswordInput):
