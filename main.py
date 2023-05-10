@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
 from typing import List
 import mysql.connector
 from mysql.connector import errorcode
@@ -13,6 +13,7 @@ from crud import get_utilisateur, create_utilisateur, delete_utilisateur, get_al
 from database import SessionLocal
 from schemas import LoginInput, ResetPasswordInput, UserLogged
 from crud import authenticate_user, reset_password
+from Azure import upload_to_azure_storage
 
 # Charger les valeurs du fichier .env
 load_dotenv()
@@ -114,6 +115,11 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+@app.post("/upload")
+async def upload_audio_file(audio: UploadFile = File(...)):
+    upload_to_azure_storage(audio)
+    return {"detail": "Audio file uploaded successfully"}
 
 @app.delete("/utilisateurs/{user_id}")
 async def remove_user(user_id: int, db: Session = Depends(get_db)):
