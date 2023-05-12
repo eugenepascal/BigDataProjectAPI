@@ -7,12 +7,18 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from starlette import status
+from torch.autograd import Variable
+import torchaudio
+import torch
+import numpy as np
+import io
 
 from schemas import UtilisateurCreate, UtilisateurOut
 from crud import get_utilisateur, create_utilisateur, delete_utilisateur, get_all_utilisateurs
 from database import SessionLocal
 from schemas import LoginInput, ResetPasswordInput, UserLogged
 from crud import authenticate_user, reset_password
+from model_cnn import CNN
 from Azure import upload_to_azure_storage
 
 # Charger les valeurs du fichier .env
@@ -32,6 +38,11 @@ config = {
 }
 
 app = FastAPI()
+
+model = CNN()
+model.load_state_dict(torch.load('model_state_dict.pt'))
+model.eval()
+
 
 origins = ["*"]
 
@@ -108,7 +119,6 @@ async def create_user(user: UtilisateurCreate):
         "Date_inscription": user.Date_inscription,
     }
 
-
 @app.get("/utilisateurs/{user_id}", response_model=UtilisateurOut)
 async def get_user(user_id: int, db: Session = Depends(get_db)):
     user = get_utilisateur(db, user_id)
@@ -120,6 +130,32 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
 async def upload_audio_file(audio: UploadFile = File(...)):
     upload_to_azure_storage(audio)
     return {"detail": "Audio file uploaded successfully"}
+
+valid_sentences = ['deux', 'non', 'oui', 'quatre', 'trois', 'un']
+
+@app.post("/predict/")
+async def predict_audio(file: UploadFile = File(...)):
+    # Load the audio file
+    blob = await file.read()
+    sound, sample_rate = torchaudio.load(io.BytesIO(blob))
+
+    # Padding
+    max_length = 48000  # You might need to adjust this value
+    if sound.shape[1] < max_length:
+        padding = torch.zeros(1, max_length - sound.shape[1])
+        sound = torch.cat([sound, padding], dim=1)
+
+    # MelSpectrogram
+    specgram = torchaudio.transforms.MelSpectrogram(sample_rate, n_fft=1024, n_mels=64)(sound)
+    specgram = torchaudio.transforms.AmplitudeToDB(top_db=80)(specgram)
+
+    # Adding batch dimension
+    specgram = specgram.unsqueeze(0)
+
+    # Pass through the model
+    outputs = model(specgram)
+    _, predicted = torch.max(outputs.data, 1)
+    return {"prediction": valid_sentences[predicted.item()]}
 
 @app.delete("/utilisateurs/{user_id}")
 async def remove_user(user_id: int, db: Session = Depends(get_db)):
