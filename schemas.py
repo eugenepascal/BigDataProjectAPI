@@ -8,6 +8,15 @@ class UtilisateurBase(BaseModel):
     Email: str
     Mot_de_passe: str
 
+class GameCreate(BaseModel):
+    ID_utilisateur: int
+    ID_Categorie : int
+    Difficulte: str
+    Nombre_questions: int
+    Type_questions: str
+    Pourcentage_reussite: int
+    Date_partie : date
+
 class UtilisateurCreate(UtilisateurBase):
     Date_inscription: Optional[date] = None
 

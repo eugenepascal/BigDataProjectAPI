@@ -13,7 +13,7 @@ import torch
 import numpy as np
 import io
 
-from schemas import UtilisateurCreate, UtilisateurOut
+from schemas import UtilisateurCreate, UtilisateurOut, GameCreate
 from crud import get_utilisateur, create_utilisateur, delete_utilisateur, get_all_utilisateurs
 from database import SessionLocal
 from schemas import LoginInput, ResetPasswordInput, UserLogged
@@ -38,6 +38,8 @@ config = {
 }
 
 app = FastAPI()
+
+valid_sentences = ['deux', 'non', 'oui', 'quatre', 'trois', 'un']
 
 model = CNN()
 model.load_state_dict(torch.load('model_state_dict.pt'))
@@ -80,7 +82,7 @@ async def read_root():
     return {"message": "Successfully connected to Azure MySQL database!"}
 
 @app.get("/utilisateurs")
-async def get_all_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def get_all_users(skip: int = 0, limit: int = 100,):
     conn = mysql.connector.connect(**config)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM utilisateurs;")
@@ -88,7 +90,7 @@ async def get_all_users(skip: int = 0, limit: int = 100, db: Session = Depends(g
     conn.commit()
     cursor.close()
     conn.close()
-    return rows#users#get_all_utilisateurs(db, skip=skip, limit=limit)
+    return rows
 
 @app.post("/utilisateurs/", response_model=UtilisateurOut)
 async def create_user(user: UtilisateurCreate):
@@ -126,12 +128,43 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+@app.post("/game", response_model=UtilisateurOut)
+async def insert_game(game: GameCreate):
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Générer un ID_utilisateur unique pour le nouvel utilisateur
+    cursor.execute("SELECT MAX(ID_Partie) FROM Utilisateurs")
+    max_id = cursor.fetchone()[0]
+    new_id = max_id + 1 if max_id is not None else 1
+
+    # Insérer le nouvel utilisateur dans la base de données
+    cursor.execute(
+        f"INSERT INTO parties (ID_partie, ID_utilisateur, ID_Categorie, Difficulte,"
+        f" Nombre_questions, Type_questions, Pourcentage_reussite, Date_partie) "
+        f"VALUES ({new_id}, '{game.ID_utilisateur}', '{game.ID_Categorie}', '{game.Difficulte}', '{game.Nombre_questions}'"
+        f", '{game.Type_questions}', '{game.Pourcentage_reussite}', '{game.Date_partie}')"
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    # Retourner le nouvel utilisateur créé
+    return {
+        "ID_utilisateur": new_id,
+        "Nom_utilisateur": user.Nom_utilisateur,
+        "Email": user.Email,
+        "Mot_de_passe": user.Mot_de_passe,
+        "Date_inscription": user.Date_inscription,
+    }
+
 @app.post("/upload")
 async def upload_audio_file(audio: UploadFile = File(...)):
     upload_to_azure_storage(audio)
     return {"detail": "Audio file uploaded successfully"}
 
-valid_sentences = ['deux', 'non', 'oui', 'quatre', 'trois', 'un']
+
 
 @app.post("/predict/")
 async def predict_audio(file: UploadFile = File(...)):
@@ -174,7 +207,6 @@ async def login_route(login_input: LoginInput):
     conn.commit()
     cursor.close()
     conn.close()
-    print(user[0])
     if user is None or user[3] != login_input.Mot_de_passe:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nom_utilisateur ou mot de passe incorrect")
     return {
