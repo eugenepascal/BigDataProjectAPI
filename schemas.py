@@ -19,7 +19,8 @@ class GameCreate(BaseModel):
 
 class UtilisateurCreate(UtilisateurBase):
     Date_inscription: Optional[date] = None
-
+    age: Optional[int] = 0
+    pays: Optional[str] = "Non renseigné"
     @validator("Mot_de_passe")
     def validate_password(cls, value):
         if len(value) < 8:
@@ -56,3 +57,5 @@ class ResetPasswordInput(BaseModel):
 class UserLogged(UtilisateurBase):
     ID_utilisateur: int
     Date_inscription: date
+    age: int
+    pays: str

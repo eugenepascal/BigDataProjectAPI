@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Body
 from typing import List
 import mysql.connector
 from mysql.connector import errorcode
@@ -66,7 +66,6 @@ def test_connection():
         print(f"Error in test_connection: {e}")  # Afficher l'erreur pour aider au débogage
         return False
 
-
 @app.on_event("startup")
 async def startup():
     if not test_connection():
@@ -94,6 +93,7 @@ async def get_all_users(skip: int = 0, limit: int = 100,):
 
 @app.post("/utilisateurs/", response_model=UtilisateurOut)
 async def create_user(user: UtilisateurCreate):
+    print(user)
     conn = mysql.connector.connect(**config)
     cursor = conn.cursor()
 
@@ -104,8 +104,8 @@ async def create_user(user: UtilisateurCreate):
 
     # Insérer le nouvel utilisateur dans la base de données
     cursor.execute(
-        f"INSERT INTO Utilisateurs (ID_utilisateur, Nom_utilisateur, Email, Mot_de_passe, Date_inscription) "
-        f"VALUES ({new_id}, '{user.Nom_utilisateur}', '{user.Email}', '{user.Mot_de_passe}', '{user.Date_inscription}')"
+        f"INSERT INTO Utilisateurs (ID_utilisateur, Nom_utilisateur, Email, Mot_de_passe, Date_inscription, age, pays) "
+        f"VALUES ({new_id}, '{user.Nom_utilisateur}', '{user.Email}', '{user.Mot_de_passe}', '{user.Date_inscription}', '{user.age}', '{user.pays}')"
     )
 
     conn.commit()
@@ -128,13 +128,13 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@app.post("/game", response_model=UtilisateurOut)
-async def insert_game(game: GameCreate):
+@app.post("/game")
+async def insert_game(game: GameCreate = Body(...)):
     conn = mysql.connector.connect(**config)
     cursor = conn.cursor()
 
     # Générer un ID_utilisateur unique pour le nouvel utilisateur
-    cursor.execute("SELECT MAX(ID_Partie) FROM Utilisateurs")
+    cursor.execute("SELECT MAX(ID_Partie) FROM parties")
     max_id = cursor.fetchone()[0]
     new_id = max_id + 1 if max_id is not None else 1
 
@@ -150,21 +150,60 @@ async def insert_game(game: GameCreate):
     cursor.close()
     conn.close()
 
-    # Retourner le nouvel utilisateur créé
-    return {
-        "ID_utilisateur": new_id,
-        "Nom_utilisateur": user.Nom_utilisateur,
-        "Email": user.Email,
-        "Mot_de_passe": user.Mot_de_passe,
-        "Date_inscription": user.Date_inscription,
-    }
+@app.post("/nbgamesperdiff")
+async def get_nb_games(user_id: int):
+    listOfResults = []
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Générer un ID_utilisateur unique pour le nouvel utilisateur
+    cursor.execute(f'SELECT Difficulte, COUNT(*) FROM quizzgame.parties WHERE parties.ID_Utilisateur = {user_id} GROUP BY Difficulte')
+    rows = cursor.fetchall()
+    for row in rows:
+        listOfResults.append({row[0] : row[1]});
+    return listOfResults;
+
+@app.post("/categories")
+async def get_categories():
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Générer un ID_utilisateur unique pour le nouvel utilisateur
+    cursor.execute(f'SELECT ID_categorie, Nom_categorie FROM categories')
+    rows = cursor.fetchall()
+    return rows
+
+@app.post("/nbgamepercat")
+async def get_scorePerDiff(user_id: int):
+    listOfResults = []
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Générer un ID_utilisateur unique pour le nouvel utilisateur
+    cursor.execute(f'SELECT c.Nom_categorie, COUNT(*) FROM parties p JOIN categories c ON p.ID_categorie = c.ID_categorie WHERE p.ID_Utilisateur = {user_id} GROUP BY c.Nom_categorie')
+    rows = cursor.fetchall()
+    print(rows)
+    for row in rows:
+        listOfResults.append({row[0], row[1]});
+    return listOfResults;
+
+@app.post("/nbgamesperdiff")
+async def get_nb_games(user_id: int):
+    listOfResults = []
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor()
+
+    # Générer un ID_utilisateur unique pour le nouvel utilisateur
+    cursor.execute(f'SELECT Difficulte, COUNT(*) FROM quizzgame.parties WHERE parties.ID_Utilisateur = {user_id} GROUP BY Difficulte')
+    rows = cursor.fetchall()
+    for row in rows:
+        listOfResults.append({row[0] : row[1]});
+    return listOfResults;
 
 @app.post("/upload")
 async def upload_audio_file(audio: UploadFile = File(...)):
     upload_to_azure_storage(audio)
     return {"detail": "Audio file uploaded successfully"}
-
-
 
 @app.post("/predict/")
 async def predict_audio(file: UploadFile = File(...)):
@@ -209,12 +248,15 @@ async def login_route(login_input: LoginInput):
     conn.close()
     if user is None or user[3] != login_input.Mot_de_passe:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nom_utilisateur ou mot de passe incorrect")
+    print(user)
     return {
         "ID_utilisateur": user[0],
         "Nom_utilisateur": user[1],
         "Email": user[2],
         "Mot_de_passe": user[3],
         "Date_inscription": user[4],
+        "age": user[5] if user[5] is not None else 0,
+        "pays": user[6] if user[6] is not None else "Non spécifié",
     }
 
 @app.post("/reset-password")
